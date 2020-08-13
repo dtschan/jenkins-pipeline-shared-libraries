@@ -12,7 +12,8 @@ class GitCryptCommand {
     }
 
     void execute() {
-        def credentialsId = ctx.stepParams.getOptional('credentialsId', null) as String
+        def credentialsId = ctx.stepParams.getRequired('credentialsId') as String
+        def body = ctx.stepParams.getRequired('body') as Closure
         def unlocked = false
         if (credentialsId) {
             ctx.info("-- git-crypt unlock --")
@@ -21,6 +22,7 @@ class GitCryptCommand {
                     ctx.sh script: 'git-crypt unlock $GIT_CRYPT_KEYFILE'
                     unlocked = true
                 }
+                body()
             } finally {
                 if (unlocked) {
                     ctx.info("-- git-crypt lock --")
