@@ -9,24 +9,24 @@ class GitCryptCommand {
 
     GitCryptCommand(PipelineContext ctx) {
         this.ctx = ctx
-        unlocked = false
     }
 
     void execute() {
         def credentialsId = ctx.stepParams.getOptional('credentialsId', null) as String
+        def unlocked = false
         if (credentialsId) {
             ctx.info("-- git-crypt unlock --")
-            ctx.withCredentials([ctx.file(credentialsId: credentialsId, variable: 'GIT_CRYPT_KEYFILE')]) {
-                ctx.sh script: 'git-crypt unlock $GIT_CRYPT_KEYFILE'
-                unlocked = true
+            try {
+                ctx.withCredentials([ctx.file(credentialsId: credentialsId, variable: 'GIT_CRYPT_KEYFILE')]) {
+                    ctx.sh script: 'git-crypt unlock $GIT_CRYPT_KEYFILE'
+                    unlocked = true
+                }
+            } finally {
+                if (unlocked) {
+                    ctx.info("-- git-crypt lock --")
+                    ctx.sh script: 'git-crypt lock'
+                }
             }
-        }
-    }
-
-    void cleanUp() {
-        if (unlocked) {
-            ctx.info("-- git-crypt lock --")
-            ctx.sh script: 'git-crypt lock'
         }
     }
 }
