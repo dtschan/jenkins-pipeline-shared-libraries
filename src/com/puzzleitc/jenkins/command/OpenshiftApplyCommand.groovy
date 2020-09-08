@@ -2,10 +2,13 @@ package com.puzzleitc.jenkins.command
 
 import com.puzzleitc.jenkins.command.context.PipelineContext
 
+import static com.puzzleitc.jenkins.command.Constants.DEFAULT_CREDENTIAL_ID_SUFFIX
+import static com.puzzleitc.jenkins.command.Constants.DEFAULT_OC_TOOL_NAME
+
 class OpenshiftApplyCommand {
 
-    private static final DEFAULT_CREDENTIAL_ID_SUFFIX = "-cicd-deployer"
-    private static final DEFAULT_OC_TOOL_NAME = "oc_3_11"
+    private static final VALID_ROLLOUT_KINDS =
+            ["deploymentconfig", "dc", "deployment", "deploy", "daemonset", "ds", "statefulset", "sts"]
 
     private final PipelineContext ctx
 
@@ -19,6 +22,8 @@ class OpenshiftApplyCommand {
         def project = ctx.stepParams.getRequired("project")
         def cluster = ctx.stepParams.getOptional("cluster", null)
         def appLabel = ctx.stepParams.getRequired("appLabel") as String
+        def waitForRollout = ctx.stepParams.getOptional("waitForRollout", true) as boolean
+        def rolloutKind = ctx.stepParams.getOptional("rolloutKind", "dc") as String
         def rolloutSelector = ctx.stepParams.getOptional("rolloutSelector", [:]) as Map
         def credentialId = ctx.stepParams.getOptional("credentialId", null) as String
         def saToken = null as String;
@@ -39,7 +44,9 @@ class OpenshiftApplyCommand {
                         ctx.echo("openshift project: ${ctx.openshift.project()}")
                         ocConvert(configuration)
                         ocApply(configuration, appLabel)
-                        ocRollout(appLabel, rolloutSelector)
+                        if (waitForRollout) {
+                            ocWaitForRollout(appLabel, rolloutKind, rolloutSelector)
+                        }
                     }
                 }
             }
@@ -62,13 +69,20 @@ class OpenshiftApplyCommand {
         ctx.echo("oc apply output:\n${result.out}")
     }
 
-    private void ocRollout(String app, Map rolloutSelector) {
+    private void ocWaitForRollout(String appLabel, String rolloutKind, Map rolloutSelector) {
+        validateRolloutKind(rolloutKind)
         if (rolloutSelector.isEmpty()) {
-            ctx.echo("waiting for dc with selector '${app}' to be rolled out")
-            ctx.openshift.selector("dc", app).rollout().status()
+            ctx.echo("waiting for '${rolloutKind}' with selector '${appLabel}' to be rolled out")
+            ctx.openshift.selector(rolloutKind, appLabel).rollout().status()
         } else {
-            ctx.echo("waiting for dc with selector ${rolloutSelector} to be rolled out")
-            ctx.openshift.selector("dc", rolloutSelector).rollout().status()
+            ctx.echo("waiting for '${rolloutKind}' with selector ${rolloutSelector} to be rolled out")
+            ctx.openshift.selector(rolloutKind, rolloutSelector).rollout().status()
+        }
+    }
+
+    private void validateRolloutKind(String rolloutKind) {
+        if (!VALID_ROLLOUT_KINDS.contains(rolloutKind?.toLowerCase())) {
+            ctx.fail("Unsupported rollout kind: ${rolloutKind}")
         }
     }
 
