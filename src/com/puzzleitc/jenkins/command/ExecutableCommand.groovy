@@ -14,42 +14,54 @@ class ExecutableCommand {
         this.ctx = ctx
     }
 
-    String findInPath(String executable) {
+    Node getCurrentNode() {
+        String nodeName = ctx.getEnv('NODE_NAME')
+        if (nodeName.equals('master')) {
+            return Jenkins.get()
+        } else {
+            return Jenkins.get().getNode(nodeName)
+        }
+    }
+
+    // Search executable in PATH of current Jenkins node
+    String searchInPath(String executable) {
+        Node node = getCurrentNode()
         for (def path: ctx.getEnv("PATH").split(Pattern.quote(File.pathSeparator))) {
-            if (Files.isExecutable(Paths.get(path).resolve(executable))) {
+            if (node.createPath(path).child(executable).exists()) {
                 return path
             }
         }
 
         return null
-/*         exePath = Stream.of(ctx.getEnv("PATH").split(Pattern.quote(File.pathSeparator)))
-            .map(Paths.&get)
-            .filter{ Files.isExecutable(it.resolve(executable)) }.findFirst().orElse(null) */
     }
 
     Object execute() {
-        def executable = ctx.stepParams.getRequired("name") as String
-        def toolName = ctx.stepParams.getRequired("toolName") as String
+        String executable = ctx.stepParams.getRequired("name")
+        String toolName = ctx.stepParams.getRequired("toolName")
 
-        def exePath = ctx.getEnv("${executable}_PATH")
+        // Was executable found/installed in earlier invocation?
+        String exePath = ctx.getEnv("${executable}_PATH")
         if (exePath) {
             return exePath
         }
 
-        exePath = findInPath(executable)
+        // Is executable in PATH of current Jenkins node?
+        exePath = searchInPath(executable)
 
+        // Executable not found, install via tool
         if (!exePath) {
-            def toolHome = Paths.get(ctx.tool(toolName ? toolName : executable))
-            if (Files.isExecutable(toolHome.resolve("bin").resolve(executable))) {
-                exePath = toolHome.resolve("bin").toString()
+            def toolHome = ctx.tool(toolName ? toolName : executable)
+            Node node = getCurrentNode()
+            if (node.createPath(toolHome).child('bin').child(executable).exists()) {
+                exePath = "${toolHome}/bin"
             } else {
-                exePath = toolHome.toString()
+                exePath = toolHome
             }
-            // toolHome = null
         }
 
+        // Store path for later invocations
         ctx.setEnv("${executable}_PATH", exePath)
 
-        return exePath;
+        return exePath
     }
 }

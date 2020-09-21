@@ -36,6 +36,10 @@ Object callFile(Map args) {
     file(args)
 }
 
+boolean callFileExists(String file) {
+    fileExists(file)
+}
+
 def callAnsiColor(String colorMapName, Closure<Void> closure) {
     ansiColor(colorMapName) {
         closure.call()

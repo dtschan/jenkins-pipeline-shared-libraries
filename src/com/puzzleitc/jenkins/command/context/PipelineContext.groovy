@@ -12,6 +12,8 @@ interface PipelineContext {
 
     Object file(Map map)
 
+    boolean fileExists(String file)
+
     String tool(String toolName)
 
     String executable(String name, String toolName)

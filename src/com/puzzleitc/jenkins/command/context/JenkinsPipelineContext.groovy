@@ -35,6 +35,11 @@ class JenkinsPipelineContext implements PipelineContext {
     }
 
     @Override
+    boolean fileExists(String file) {
+        invoker.callFileExists(file)
+    }
+
+    @Override
     String tool(String toolName) {
         invoker.callTool(toolName)
     }
